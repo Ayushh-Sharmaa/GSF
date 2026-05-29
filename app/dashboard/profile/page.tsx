@@ -7,6 +7,8 @@ import { useProfile } from "@/lib/hooks/useProfile";
 import { useUser } from "@clerk/nextjs";
 import { User, Edit3, Save, Mail, Globe, Link2, MapPin, Camera } from "lucide-react";
 import Image from "next/image";
+import { calculateProfileCompletion } from "@/lib/utils/profileCompletion";
+import ProfileCompletionBar from "@/components/ProfileCompletionBar";
 
 const fadeUp = (d = 0) => ({
   initial: { opacity: 0, y: 16 },
@@ -16,6 +18,7 @@ const fadeUp = (d = 0) => ({
 
 export default function ProfilePage() {
   const { profile, loading, saving, updateProfile, refetch } = useProfile();
+  const percent = calculateProfileCompletion(profile, "FOUNDER");
   const { user: clerkUser } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -112,6 +115,7 @@ export default function ProfilePage() {
               Your public founder profile visible to experts and investors.
             </p>
           </div>
+          <ProfileCompletionBar percent={percent} />
           <div className="flex items-center gap-2">
             {saved && (
               <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-emerald-500 font-medium">
