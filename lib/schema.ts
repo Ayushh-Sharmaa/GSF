@@ -145,6 +145,23 @@ export const notifications = pgTable("notifications", {
 });
 
 // ===================================================
+// IN-APP NOTIFICATIONS (real-time alerts)
+// ===================================================
+export const inAppNotifications = pgTable("in_app_notifications", {
+  id:            uuid("id").defaultRandom().primaryKey(),
+  recipientClerkId: text("recipient_clerk_id").notNull(),
+  type:          text("type").notNull(), // message | session | system | venture | credit
+  title:         text("title").notNull(),
+  message:       text("message").notNull(),
+  actionUrl:     text("action_url"),
+  actionLabel:   text("action_label"),
+  metadata:      jsonb("metadata").$type<any>().default({}),
+  isRead:        boolean("is_read").default(false),
+  readAt:        timestamp("read_at"),
+  createdAt:     timestamp("created_at").defaultNow(),
+});
+
+// ===================================================
 // CREDIT TRANSACTIONS
 // ===================================================
 export const creditTransactions = pgTable("credit_transactions", {
@@ -271,6 +288,8 @@ export type InvestmentInterest   = typeof investmentInterests.$inferSelect;
 export type NewInvestmentInterest= typeof investmentInterests.$inferInsert;
 export type CreditBalance        = typeof creditBalances.$inferSelect;
 export type Notification         = typeof notifications.$inferSelect;
+export type InAppNotification    = typeof inAppNotifications.$inferSelect;
+export type NewInAppNotification = typeof inAppNotifications.$inferInsert;
 export type SessionFeedback      = typeof sessionFeedback.$inferSelect;
 export type Article              = typeof articles.$inferSelect;
 export type NewArticle           = typeof articles.$inferInsert;

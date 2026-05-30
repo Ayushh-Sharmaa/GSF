@@ -67,50 +67,6 @@ export const POST = withRouteErrorHandling(async (req: Request) => {
 
   return NextResponse.json(created, { status: 201 });
 });
-  try {
-    const [created] = await db
-      .insert(sessionFeedback)
-      .values({
-        sessionId,
-        founderClerkId: userId,
-        expertClerkId: session.expertClerkId,
-        rating,
-        feedback: feedback || "",
-      })
-      .returning();
-
-    const wasAlreadyCompleted = session.status === "completed";
-
-    await db
-      .update(sessions)
-      .set({
-        status: "completed",
-        recordingReadyAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(sessions.id, sessionId));
-
-    if (!wasAlreadyCompleted) {
-      try {
-        await awardSessionCompletionCredits(
-          sessionId,
-          session.expertClerkId,
-          session.creditsEarned,
-        );
-      } catch (err) {
-        console.error("Failed to award expert credits for session", sessionId, err);
-      }
-    }
-
-    return NextResponse.json(created, { status: 201 });
-  } catch (err) {
-    console.error("Failed to submit feedback", err);
-    return NextResponse.json(
-      { error: "Failed to submit feedback" },
-      { status: 500 }
-    );
-  }
-}
 
 // GET feedback for a session or expert
 export const GET = withRouteErrorHandling(async (req: Request) => {

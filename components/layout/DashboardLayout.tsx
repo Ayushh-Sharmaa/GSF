@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { Menu, Bell, Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/ui/NotificationBell";
+import { NotificationToast } from "@/components/ui/NotificationToast";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -24,6 +26,9 @@ export function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-canvas overflow-hidden">
+      {/* Real-time notification toasts */}
+      <NotificationToast />
+      
       {/* Desktop sidebar */}
       <div className="hidden lg:flex flex-col flex-shrink-0">
         <Sidebar role={role} userName={userName} userEmail={userEmail} />
@@ -71,10 +76,7 @@ export function DashboardLayout({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <button className="relative p-2 rounded-xl hover:bg-gray-100 text-text-secondary transition-colors">
-              <Bell className="size-5" />
-              <span className="absolute top-1.5 right-1.5 size-2 bg-primary-500 rounded-full" />
-            </button>
+            <NotificationBell />
             <div className="size-9 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-sm font-semibold">
               {userName[0]?.toUpperCase()}
             </div>

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { sessions, sessionFeedback } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 import { awardSessionCompletionCredits } from "@/lib/credits-server";
+import { requireAuth, withRouteErrorHandling, ApiRouteError, parseJsonBody } from "@/lib/api/route-helpers";
 
 const DEMO_SESSIONS: Record<string, Record<string, unknown>> = {
   "demo-1": {

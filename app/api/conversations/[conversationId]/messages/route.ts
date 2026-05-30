@@ -9,6 +9,7 @@ import {
   ApiRouteError,
 } from "@/lib/api/route-helpers";
 import { conversationsMessagePostSchema } from "@/lib/validators/api-routes";
+import { notificationService } from "@/lib/services/notificationService";
 
 type RouteContext = {
   params: Promise<{ conversationId: string }>;
@@ -72,6 +73,11 @@ export const POST = withRouteErrorHandling(async (req: Request, context: RouteCo
     })
     .returning();
 
+  // Determine recipient and send notification
+  const recipientClerkId = conversation.founderClerkId === userId 
+    ? conversation.expertClerkId 
+    : conversation.founderClerkId;
+
   if (conversation.founderClerkId === userId) {
     await db
       .update(conversations)
@@ -92,6 +98,19 @@ export const POST = withRouteErrorHandling(async (req: Request, context: RouteCo
         updatedAt: new Date(),
       })
       .where(eq(conversations.id, conversationId));
+  }
+
+  // Send in-app notification to recipient
+  try {
+    await notificationService.notifyNewMessage({
+      recipientClerkId,
+      senderName,
+      conversationId,
+      messagePreview: messageText.substring(0, 100),
+    });
+  } catch (error) {
+    console.error("Failed to send notification:", error);
+    // Don't fail the request if notification fails
   }
 
   return NextResponse.json(created, { status: 201 });
