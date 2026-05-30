@@ -162,6 +162,28 @@ export const inAppNotifications = pgTable("in_app_notifications", {
 });
 
 // ===================================================
+// USER SUBSCRIPTIONS (subscription & entitlement tracking)
+// ===================================================
+export const userSubscriptions = pgTable("user_subscriptions", {
+  id:                  uuid("id").defaultRandom().primaryKey(),
+  userId:              text("user_id").notNull().unique(), // Clerk User ID
+  planTier:            text("plan_tier").notNull().default("FREE"), // FREE | BUILDER | FOUNDER
+  status:              text("status").notNull().default("active"), // active | past_due | canceled | expired
+  currentPeriodStart:  timestamp("current_period_start").notNull().defaultNow(),
+  currentPeriodEnd:    timestamp("current_period_end"),
+  trialEndsAt:         timestamp("trial_ends_at"),
+  canceledAt:          timestamp("canceled_at"),
+  // Stripe integration fields (optional, for future use)
+  stripeCustomerId:    text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  stripePriceId:       text("stripe_price_id"),
+  // Metadata
+  metadata:            jsonb("metadata").$type<any>().default({}),
+  createdAt:           timestamp("created_at").defaultNow(),
+  updatedAt:           timestamp("updated_at").defaultNow(),
+});
+
+// ===================================================
 // CREDIT TRANSACTIONS
 // ===================================================
 export const creditTransactions = pgTable("credit_transactions", {
@@ -290,6 +312,8 @@ export type CreditBalance        = typeof creditBalances.$inferSelect;
 export type Notification         = typeof notifications.$inferSelect;
 export type InAppNotification    = typeof inAppNotifications.$inferSelect;
 export type NewInAppNotification = typeof inAppNotifications.$inferInsert;
+export type UserSubscription     = typeof userSubscriptions.$inferSelect;
+export type NewUserSubscription  = typeof userSubscriptions.$inferInsert;
 export type SessionFeedback      = typeof sessionFeedback.$inferSelect;
 export type Article              = typeof articles.$inferSelect;
 export type NewArticle           = typeof articles.$inferInsert;
