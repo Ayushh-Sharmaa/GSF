@@ -4,7 +4,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import Link from "next/link";
 import { ALL_EXPERTS, nameToSlug } from "@/lib/data/experts";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Star,
@@ -51,7 +51,7 @@ function readParam(params: URLSearchParams, key: string, fallback: string) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ExpertsPage() {
+function ExpertsContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
@@ -558,5 +558,17 @@ export default function ExpertsPage() {
 
       <Footer />
     </>
+  );
+}
+
+export default function ExpertsPage() {
+  return (
+    <Suspense fallback={
+      <div className="pt-24 min-h-screen bg-background flex items-center justify-center">
+        <div className="size-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ExpertsContent />
+    </Suspense>
   );
 }
