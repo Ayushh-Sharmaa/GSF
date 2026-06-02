@@ -266,7 +266,10 @@ export default function VenturesPage() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 {filtered.map((v) => {
                   const stageStyle = STAGE_STYLES[v.stage] || STAGE_STYLES["Ideation"];
-                  const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+                  const colorIndex = v.id
+                    ? Array.from(v.id as string).reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0) % AVATAR_COLORS.length
+                    : 0;
+                  const avatarColor = AVATAR_COLORS[colorIndex];
                   const score = v.validationScore ?? computeValidationScore(v);
                   const sc = getScoreColor(score);
                   return (

@@ -37,15 +37,6 @@ export default function BookingModal({ expert, isOpen, onClose, onSuccess }: Boo
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [booking, setBooking] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && expert) {
-      loadSlots();
-    } else {
-      setSlots([]);
-      setSelectedSlot(null);
-    }
-  }, [isOpen, expert]);
-
   async function loadSlots() {
     if (!expert) return;
     setLoading(true);
@@ -61,6 +52,15 @@ export default function BookingModal({ expert, isOpen, onClose, onSuccess }: Boo
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (isOpen && expert) {
+      loadSlots();
+    } else {
+      setSlots([]);
+      setSelectedSlot(null);
+    }
+  }, [isOpen, expert]);
 
   async function handleConfirmBooking() {
     if (!selectedSlot || !expert) return;

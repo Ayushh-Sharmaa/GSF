@@ -237,7 +237,7 @@ export default function RoadmapTracker() {
             Create Your Roadmap
           </h2>
           <p className="text-secondary mb-6">
-            Map out your venture's strategic milestones and track progress visually
+            Map out your venture&apos;s strategic milestones and track progress visually
           </p>
           <div className="space-y-4">
             <input

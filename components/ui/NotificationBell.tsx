@@ -60,7 +60,7 @@ function NotificationItem({
           
           <div className="flex items-center gap-3 mt-2">
             <span className="text-xs text-text-muted">
-              {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+              {formatDistanceToNow(notification.createdAt ? new Date(notification.createdAt) : new Date())}
             </span>
             
             {notification.actionUrl && notification.actionLabel && (
@@ -223,7 +223,7 @@ export function NotificationBell() {
                   <Bell className="size-12 text-text-muted mx-auto mb-3 opacity-50" />
                   <p className="text-sm font-medium text-text-primary">No notifications</p>
                   <p className="text-xs text-text-muted mt-1">
-                    You're all caught up!
+                    You&apos;re all caught up!
                   </p>
                 </div>
               ) : (

@@ -19,7 +19,7 @@ export class ApiRouteError extends Error {
   code?: string;
   fieldErrors?: ApiFieldErrors;
 
-  constructor(status: number, error: string, options?: { code?: string; fieldErrors?: ApiFieldErrors }) {
+  constructor(status: number, error: string, options?: { code?: string; fieldErrors?: ApiFieldErrors; [key: string]: any }) {
     super(error);
     this.status = status;
     this.code = options?.code;

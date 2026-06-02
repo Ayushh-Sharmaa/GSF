@@ -107,7 +107,7 @@ export const notificationTemplates = {
  */
 export async function sendNotification(
   recipientClerkId: string,
-  template: ReturnType<typeof notificationTemplates[keyof typeof notificationTemplates]>,
+  template: Omit<CreateNotificationParams, "recipientClerkId" | "metadata">,
   metadata?: Record<string, any>
 ) {
   return createNotification({

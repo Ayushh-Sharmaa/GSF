@@ -55,7 +55,7 @@ export function SolutionSection() {
               </h2>
               <p className="text-lg text-text-secondary leading-relaxed">
                 We give students the structure, tools, and people they need to
-                move from "I have an idea" to "I have evidence." No MBA required.
+                move from &quot;I have an idea&quot; to &quot;I have evidence.&quot; No MBA required.
               </p>
             </div>
 
