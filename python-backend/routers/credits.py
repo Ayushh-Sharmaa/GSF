@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from auth import get_current_user_id
 from database import get_db
 from models import CreditTransaction
-from auth import get_current_user_id
 
 router = APIRouter(prefix="/api/credits", tags=["credits"])
 

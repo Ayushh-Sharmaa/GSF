@@ -1,12 +1,14 @@
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+
+from auth import get_current_user_id
 from database import get_db
 from models import Session
-from auth import get_current_user_id
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 

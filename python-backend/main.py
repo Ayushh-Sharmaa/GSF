@@ -1,9 +1,11 @@
 import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from routers import sessions, credits, ventures
-from dotenv import load_dotenv
+
+from routers import credits, sessions, ventures
 
 load_dotenv()
 

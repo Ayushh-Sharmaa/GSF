@@ -1,11 +1,13 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Any
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from auth import get_current_user_id
 from database import get_db
 from models import Venture
-from auth import get_current_user_id
 
 router = APIRouter(prefix="/api/ventures", tags=["ventures"])
 
