@@ -1,0 +1,51 @@
+name: Label Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/labels/*.json'
+  workflow_dispatch:
+
+concurrency:
+  group: label-sync
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sync-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync labels from gssoc-labels.json
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+
+            const labelDefs = JSON.parse(fs.readFileSync('.github/labels/gssoc-labels.json', 'utf8'));
+
+            for (const def of labelDefs) {
+              const { name, color, description } = def;
+              try {
+                const existing = await github.rest.issues.getLabel({ owner, repo, name });
+                // Update if color or description changed
+                if (existing.data.color !== color || existing.data.description !== description) {
+                  await github.rest.issues.updateLabel({ owner, repo, name, color, description });
+                  console.log(`Updated label: ${name}`);
+                }
+              } catch (e) {
+                if (e.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, name, color, description });
+                  console.log(`Created label: ${name}`);
+                } else {
+                  throw e;
+                }
+              }
+            }
+            console.log('Label sync complete.');

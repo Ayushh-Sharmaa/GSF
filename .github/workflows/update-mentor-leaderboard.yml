@@ -1,0 +1,30 @@
+name: Update Mentor Leaderboard (Scheduled)
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # Daily at midnight UTC
+  workflow_dispatch:
+
+concurrency:
+  group: update-mentor-leaderboard
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+
+jobs:
+  trigger-leaderboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch mentors-leaderboard workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: 'mentors-leaderboard.yml',
+              ref: 'main'
+            });
+            console.log('Dispatched mentors-leaderboard workflow.');

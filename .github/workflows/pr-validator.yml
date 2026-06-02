@@ -1,0 +1,58 @@
+name: PR Validator
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
+
+concurrency:
+  group: pr-validator-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+            const missing = [];
+
+            // Check 1: linked issue
+            if (!/closes\s+#\d+/i.test(body)) missing.push('`Closes #<issue-number>` reference');
+
+            // Check 2: non-empty description section
+            if (!/##\s*(📝\s*)?description/i.test(body) || body.match(/##\s*(📝\s*)?description[^\n]*\n+\s*(\n|##)/i)) {
+              if (!/description[\s\S]{10,}/i.test(body)) missing.push('Non-empty **Description** section');
+            }
+
+            // Check 3: checklist section exists
+            if (!/-\s*\[[ xX]\]/.test(body)) missing.push('**Checklist** section with at least one checkbox');
+
+            const ensureLabel = async (name, color = 'EDEDED') => {
+              try { await github.rest.issues.getLabel({ owner, repo, name }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name, color }); }
+            };
+
+            if (missing.length > 0) {
+              await ensureLabel('needs-pr-fixes', 'E4E669');
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['needs-pr-fixes'] });
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: 'pr-valid' }); } catch {}
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `❌ **PR Validation Failed**\n\nThe following required elements are missing:\n${missing.map(m => `- ${m}`).join('\n')}\n\nPlease edit your PR description to include them, then push a new commit or re-save the description. 📝`
+              });
+            } else {
+              await ensureLabel('pr-valid', '0E8A16');
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['pr-valid'] });
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: 'needs-pr-fixes' }); } catch {}
+            }

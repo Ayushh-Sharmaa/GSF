@@ -20,5 +20,6 @@ async def get_credits(
         .limit(50)
     )
     log = result.scalars().all()
+    # Default balance of 600 when no transactions exist yet (matches Clerk metadata default)
     balance = log[0].balance_after if log else 600
     return {"balance": balance, "log": log}

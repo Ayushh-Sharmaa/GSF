@@ -1,0 +1,25 @@
+# pyproject.toml — Python project configuration for the GSF backend
+# This file tells type checkers (Pyrefly, Pyright, mypy) and linters
+# where the Python source root is, so imports like `from routers import ...`
+# resolve correctly when running from the python-backend/ directory.
+
+[tool.pyright]
+pythonVersion = "3.11"
+pythonPlatform = "Linux"
+venvPath = "."
+venv = "venv"
+include = ["."]
+exclude = ["**/__pycache__", "venv", ".venv"]
+# All imports are relative to python-backend/ (the working directory for uvicorn)
+reportMissingImports = false
+reportMissingModuleSource = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+exclude = ["venv", ".venv", "__pycache__"]
+
+[tool.ruff.isort]
+known-first-party = ["routers", "auth", "database", "models"]

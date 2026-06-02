@@ -1,0 +1,62 @@
+name: Detect Ping Spam
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: ping-spam-${{ github.event.issue.number }}-${{ github.actor }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  detect-ping-spam:
+    runs-on: ubuntu-latest
+    if: github.event.sender.type != 'Bot'
+    steps:
+      - name: Count maintainer pings and warn/flag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue = context.payload.issue;
+            const commenter = context.payload.comment.user.login;
+            const commentBody = context.payload.comment.body || '';
+
+            // Maintainers list — extend as needed
+            const MAINTAINERS = ['S3DFX-CYBER', 'Ayushh-Sharmaa'];
+
+            const pingedMaintainers = MAINTAINERS.filter(m => commentBody.includes(`@${m}`));
+            if (pingedMaintainers.length === 0) return;
+
+            // Count how many times commenter has pinged maintainers in this thread
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: issue.number, per_page: 100
+            });
+
+            let pingCount = 0;
+            for (const c of comments) {
+              if (c.user.login !== commenter) continue;
+              const hasPing = MAINTAINERS.some(m => (c.body || '').includes(`@${m}`));
+              if (hasPing) pingCount++;
+            }
+
+            if (pingCount === 2) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issue.number,
+                body: `⚠️ @${commenter} — this is a friendly reminder about our **ping policy**.\n\nMaintainers and mentors are volunteers and may take **24–72 hours** to respond. Please avoid repeatedly tagging them — it doesn't speed up the process and can be disruptive.\n\nThank you for your patience! 🙏`
+              });
+            } else if (pingCount >= 3) {
+              try { await github.rest.issues.getLabel({ owner, repo, name: 'ping-spam' }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name: 'ping-spam', color: 'EE0701', description: 'Repeated pinging of maintainers' }); }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: ['ping-spam'] });
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issue.number,
+                body: `🚨 @${commenter} — this issue has been flagged for **repeated maintainer pinging** (${pingCount} times). Further repeated pings may result in temporary contribution restrictions.\n\nA maintainer will review when available. Please wait patiently. 🙏`
+              });
+            }

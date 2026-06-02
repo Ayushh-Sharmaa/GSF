@@ -1,0 +1,11 @@
+{
+  "mentors": [
+    {
+      "username": "Ayushh-Sharmaa",
+      "active": true,
+      "program": ["gssoc", "nsoc"],
+      "joinedAt": "2025-01-01"
+    }
+  ],
+  "updatedAt": "2026-06-01T00:00:00Z"
+}

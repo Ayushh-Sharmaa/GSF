@@ -1,426 +1,264 @@
 # GSF — Global Society of Founders
 
-![Next.js](https://img.shields.io/badge/Next.js-16-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)
-![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-v4-38B2AC)
-![License](https://img.shields.io/badge/license-MIT-green)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+> A global-first digital platform for student founders. Validate ideas, connect with world-class experts, and build with confidence.
 
-> **A Society for Founders. Not Talkers.**
-
-GSF is a professional platform connecting student founders with world-class expert mentors via video call and chat, and providing an equity-based venture marketplace where students can list startup ideas and attract investors.
+[![Code Quality](https://github.com/Ayushh-Sharmaa/GSF/actions/workflows/code-quality.yml/badge.svg)](https://github.com/Ayushh-Sharmaa/GSF/actions/workflows/code-quality.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
 ---
 
-## 📚 Table of Contents
+## 🏗️ Stack
 
-- [Live Platform](#live-platform)
-- [Features](#features)
-- [What GSF Does](#what-gsf-does)
-- [Design System](#design-system)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture-route-groups--role-areas)
-- [Route Inventory](#route-inventory)
-- [Environment Variables](#environment-variables)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
-- [Repository Standards](#repository-standards)
-- [Issue Labels](#issue-labels)
-- [Contact](#contact)
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | Next.js 16 (App Router), React 19, TypeScript, TailwindCSS v4 |
+| **Auth** | Clerk — identity, sessions, role management |
+| **Database** | PostgreSQL — Drizzle ORM (Next.js) + SQLAlchemy async (Python) |
+| **Python Backend** | FastAPI, SQLAlchemy async, asyncpg |
+| **Email** | Nodemailer (SMTP) |
+| **Webhooks** | Svix (Clerk webhook verification) |
+| **Deployment** | Vercel (frontend) + Render (Python backend) |
 
 ---
 
-## Live Platform
-
-**URL:** [http://localhost:3000](http://localhost:3000) (development)  
-
----
-
-## Features
-
-- 1-on-1 mentorship calls with industry experts
-- Equity-based venture marketplace
-- Founder and expert role-based dashboards
-- Secure authentication with Clerk
-- Community-driven founder ecosystem
-- Responsive and modern UI
-- Venture listing and investor interaction
-- Real-time collaboration experience
-
----
-
-## What GSF Does
-
-| Feature | Description |
-|---|---|
-| **GSF Connect** | Students book 1-on-1 video calls with expert mentors (VCs, founders, product leaders). Async chat follow-up included. |
-| **GSF Ventures** | Students list startup ideas with equity terms. Venture creators fund them directly. GSF takes **1–2% platform fee** on completed equity deals. |
-| **Expert Network** | 40+ vetted domain experts across fundraising, product, growth, legal, and impact. |
-| **Community** | Global network of 500+ student founders with cohort calls, Slack, and accountability pods. |
-
-### Pricing Model
-- **Free for 30 days** — full platform access, no credit card required
-- **₹999/month** — Builder plan (unlimited Connect calls, list ventures)
-- **₹2,499/month** — Founder plan (everything + investor intros + dedicated advisor)
-- **1–2% fee** on equity deals closed via GSF Ventures
-
----
-
-## Design System
-
-| Token | Value | Usage |
-|---|---|---|
-| Primary blue | `#81A6C6` | Buttons, links, active states |
-| Powder blue | `#AACDDC` | Badges, highlights, borders |
-| Warm cream | `#F3E3D0` | Section backgrounds, warm cards |
-| Warm taupe | `#D2C4B4` | Borders, dividers, muted elements |
-| Background | `#FDFAF7` | Page background |
-| Text primary | `#1A2332` | Headings, body |
-| Text secondary | `#4A5668` | Body copy |
-
-**Fonts:**
-- `Playfair Display` — serif headings (premium editorial feel)
-- `Inter` — body, UI elements, labels
-
----
-
-## Project Structure
+## 📁 Project Structure
 
 ```
-app/
-├── page.tsx              # Homepage
-├── connect/page.tsx      # Video call + expert chat platform
-├── ventures/page.tsx     # Startup idea marketplace
-├── experts/page.tsx      # Expert mentor directory
-├── community/page.tsx    # Community hub
-├── about/page.tsx        # About GSF
-├── apply/page.tsx        # Student application form
-├── sign-in/page.tsx      # Authentication - Login
-├── sign-up/page.tsx      # Authentication - Register
-├── contact/page.tsx      # Contact form
-├── careers/page.tsx      # Open roles
-├── insights/page.tsx     # Articles + founder resources
-├── programs/page.tsx     # Platform overview
-├── privacy/page.tsx      # Privacy policy
-├── terms/page.tsx        # Terms of service
-├── cookies/page.tsx      # Cookies policy
-└── globals.css           # Design system tokens + utilities
-
-components/
-├── layout/
-│   ├── Navbar.tsx        # Navigation with circular GSF logo
-│   └── Footer.tsx        # Footer with links and brand tagline
-├── landing/
-│   └── HeroSection.tsx   # Homepage hero with stats
-└── ui/
-    └── Button.tsx        # Multi-variant button component
+GSF/
+├── app/                         # Next.js App Router pages
+│   ├── (auth)/                  # Sign-in / sign-up routes
+│   ├── (student)/               # Student dashboard routes
+│   ├── (expert)/                # Expert dashboard routes
+│   ├── (admin)/                 # Admin routes
+│   ├── api/                     # Next.js API route handlers (23 endpoints)
+│   ├── actions/                 # Next.js Server Actions
+│   ├── layout.tsx               # Root layout (Clerk, ThemeProvider, Navbar)
+│   └── globals.css              # Global styles + CSS custom properties
+│
+├── components/                  # Reusable React components
+│   ├── ui/                      # Base UI primitives
+│   ├── layout/                  # Navbar, ThemeProvider, PageTransition
+│   ├── landing/                 # Marketing/landing components
+│   ├── experts/                 # Expert profile components
+│   ├── matching/                # Matching engine UI
+│   └── ...
+│
+├── lib/                         # Core business logic
+│   ├── api/
+│   │   ├── client.ts            # ← Centralized Python backend API client
+│   │   └── route-helpers.ts     # Next.js route handler utilities
+│   ├── db/
+│   │   ├── index.ts             # Drizzle DB singleton
+│   │   └── schema.sql           # Raw SQL schema reference
+│   ├── schema.ts                # Drizzle ORM schema definitions
+│   ├── auth.ts                  # Clerk → AuthUser mapping
+│   ├── matchingEngine.ts        # Expert-founder matching algorithm
+│   ├── credits-server.ts        # Credit management (server-side)
+│   ├── subscription.ts          # Subscription plan logic
+│   └── ...
+│
+├── hooks/                       # Custom React hooks
+├── types/                       # TypeScript global type declarations
+├── utils/                       # Utility functions
+├── migrations/                  # SQL migration files
+│
+├── python-backend/              # FastAPI Python backend
+│   ├── routers/                 # Route handlers (sessions, credits, ventures)
+│   ├── main.py                  # App entry point (CORS, routers, health check)
+│   ├── auth.py                  # Clerk JWT validation via JWKS
+│   ├── database.py              # SQLAlchemy async engine
+│   ├── models.py                # SQLAlchemy models
+│   ├── requirements.txt         # Python dependencies
+│   ├── .env.example             # Backend environment template
+│   ├── Dockerfile               # Production Docker image
+│   └── render.yaml              # Render deployment config
+│
+├── .github/
+│   ├── workflows/               # 41 GitHub Actions workflows
+│   │   └── readme.md            # Complete workflow reference
+│   ├── reviewers/               # Mentor pool & stats JSON files
+│   └── labels/                  # Label definitions (gssoc-labels.json)
+│
+├── docs/                        # Internal developer documentation
+│   ├── CLERK_GUIDE.md
+│   ├── SUBSCRIPTION_SYSTEM.md
+│   ├── REALTIME_NOTIFICATIONS.md
+│   └── ...
+│
+├── .env.example                 # Frontend environment template ← START HERE
+├── vercel.json                  # Vercel deployment config
+├── next.config.ts               # Next.js config
+├── drizzle.config.ts            # Drizzle Kit config
+└── tailwind.config.ts           # TailwindCSS config
 ```
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
-Before running the project locally, ensure you have:
+- **Node.js** 20+ ([download](https://nodejs.org/))
+- **npm** 9+
+- **Python** 3.11+ (for the Python backend only)
+- **PostgreSQL** database — free tier at [neon.tech](https://neon.tech) or [supabase.com](https://supabase.com)
+- **Clerk account** — free at [clerk.com](https://clerk.com)
 
-- Node.js 18+
-- npm or yarn
-- Git installed
-
----
-
-### 1. Fork the Repository
-
-Click the **Fork** button on GitHub to create your own copy.
-
----
-
-### 2. Clone the Repository
+### 1. Clone the repo
 
 ```bash
-git clone https://github.com/KGFCH2/GSF.git
+git clone https://github.com/Ayushh-Sharmaa/GSF.git
 cd GSF
 ```
 
----
-
-### 3. Install Dependencies
+### 2. Set up the Next.js frontend
 
 ```bash
+# Install dependencies
 npm install
+
+# Copy the environment template and fill in your values
+cp .env.example .env.local
 ```
 
----
-
-### 4. Configure Environment Variables
-
-Create a `.env.local` file in the root directory:
-
-```env
-NEXT_PUBLIC_API_URL=your_api_url
-```
-
----
-
-### 5. Start Development Server
+Edit `.env.local`:
+- **Clerk keys** — from [Clerk Dashboard](https://dashboard.clerk.com) → Your App → API Keys
+- **DATABASE_URL** — your PostgreSQL connection string (Neon or Supabase)
+- **NEXT_PUBLIC_API_URL** — `http://localhost:8000` for local development
 
 ```bash
+# Run the dev server
 npm run dev
+# → http://localhost:3000
 ```
 
-Open:
-
-http://localhost:3000
-
----
-
-
-### Available Scripts
+### 3. Set up the Python backend (optional for full-stack)
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run start    # Start production server
-npm run lint     # Run ESLint
+cd python-backend
+
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Copy and fill in environment variables
+cp .env.example .env
 ```
 
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | [Next.js 16.2.3](https://nextjs.org) (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS v4 |
-| UI/UX | Framer Motion, Lucide React |
-| Data/SQL | Drizzle ORM + Postgres |
-| Auth | Clerk |
-| Validation | Zod |
-| Tests | Vitest |
-| Deployment | Vercel (recommended) |
-
----
-
-## Architecture: route groups & role areas
-
-This project uses Next.js App Router route groups plus Clerk-based RBAC.
-
-### 1) Route groups in `app/`
-- `app/(marketing)/...` and `app/(auth)/...`: public marketing + auth-related pages (layout/grouper only; does not change URL)
-- `app/(student)/...`, `app/(expert)/...`, `app/(admin)/...`: role-focused areas (URL paths still start at `/student`, `/expert`, `/admin` when used)
-
-### 2) Role-based areas (URLs)
-- **Founder**: `/dashboard/*` (implemented in `app/dashboard/*`)
-- **Expert**: `/expert-dashboard/*` (implemented in `app/expert-dashboard/*`)
-
-### 3) How authorization works
-Authorization is enforced in `middleware.ts` using Clerk session claims (JWT metadata):
-- public routes pass through without auth
-- signed-in, not-yet-onboarded users are redirected to `/onboarding`
-- role checks gate `/dashboard/*`, `/expert-dashboard/*`, and any `/admin/*` routes
-
-> Update both: (1) the route inventory in this README, and (2) middleware role rules when adding new protected areas.
-
----
-
-## Route Inventory
-
-> Routes are organized into **public marketing pages**, **dashboards by role**, and **API endpoints** under `app/api`.
-
-### Public pages (no role required)
-
-| Route | Purpose |
-|---|---|
-| `/` | Homepage |
-| `/about` | About GSF |
-| `/apply` | Student application |
-| `/careers` | Open roles |
-| `/community` | Community hub |
-| `/connect` | Expert booking + chat platform |
-| `/contact` | Contact form |
-| `/cookies` | Cookie policy |
-| `/experts` | Expert directory |
-| `/insights` | Articles/resources |
-| `/login` | Login portal |
-| `/privacy` | Privacy policy |
-| `/programs` | Platform overview |
-| `/sign-in` | Auth (alternative sign-in entry) |
-| `/sign-up` | Auth (registration) |
-| `/sso-callback` | SSO callback handler |
-| `/terms` | Terms |
-| `/ventures` | Venture marketplace |
-| `/ventures/list` | Venture list editor/creator UI |
-| `/unauthorized` | Unauthorized / access denied |
-
-### Role-based dashboards
-
-| Role area | Route prefix | Description |
-|---|---|---|
-| Founder | `/dashboard/*` | Founder journey: credits, sessions, venture, progress, chat, profile |
-| Expert | `/expert-dashboard/*` | Expert portal: students, sessions, profile, credits, ventures, chat, investments |
-
-#### Founder dashboard routes (`/dashboard/*`)
-- `/dashboard` (`app/dashboard/page.tsx`) — overview
-- `/dashboard/chat`
-- `/dashboard/credits`
-- `/dashboard/experts`
-- `/dashboard/profile`
-- `/dashboard/progress`
-- `/dashboard/venture`
-
-#### Expert dashboard routes (`/expert-dashboard/*`)
-- `/expert-dashboard` (`app/expert-dashboard/page.tsx`) — overview
-- `/expert-dashboard/chat`
-- `/expert-dashboard/credits`
-- `/expert-dashboard/investments`
-- `/expert-dashboard/profile`
-- `/expert-dashboard/sessions`
-- `/expert-dashboard/students`
-- `/expert-dashboard/ventures`
-
-### API endpoints (under `app/api`)
-
-| Endpoint | Method(s) | What it serves |
-|---|---|---|
-| `/api/credits` | GET | Credit balance + transaction log |
-| `/api/expert-profile` | GET | Expert extended profile |
-| `/api/onboarding-complete` | POST | Mark onboarding completion |
-| `/api/profile` | GET | Clerk user data + app bio/links from metadata |
-| `/api/sessions` | GET | Sessions for logged-in user |
-| `/api/venture` | GET, POST | Fetch/update the founder venture |
-| `/api/ventures` | (see `app/api/ventures/**`) | Ventures CRUD + interest |
-| `/api/ventures/interest` | POST | Express interest in a venture |
-| `/api/ventures/public` | GET | Public venture data |
-| `/api/webhooks/clerk` | POST | Clerk webhook receiver for sync |
-
-
----
-
-## Environment Variables
-
-Create a `.env.local` file in the root:
-
-```env
-# Add your environment variables here
-# Example:
-# NEXT_PUBLIC_API_URL=https://api.gsf.community
-```
-
----
-
-## Deployment
-
-### Deploy to Vercel (Recommended)
-
-1. Push your changes to GitHub
-2. Import the repository at [vercel.com/new](https://vercel.com/new)
-3. Set the **Root Directory** to `GSF` (the inner folder)
-4. Add environment variables if needed
-5. Deploy
-
-### Manual Build
+Edit `python-backend/.env`:
+- **DATABASE_URL** — same PostgreSQL database as the frontend
+- **CLERK_DOMAIN** — your Clerk frontend API domain (e.g. `your-app.clerk.accounts.dev`)
+- **FRONTEND_URL** — `http://localhost:3000`
 
 ```bash
-npm run build
-npm run start
+# Run the backend
+uvicorn main:app --reload --port 8000
+# → http://localhost:8000
+# → Health check: http://localhost:8000/health
 ```
 
 ---
 
-## Contributing
+## 📜 Available Scripts
 
-New contributors should be able to:
-- run the app locally
-- lint/test before opening a PR
-- understand which routes belong to which role area
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Next.js dev server |
+| `npm run build` | Production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint via next lint |
+| `npm run lint:fix` | Auto-fix ESLint errors |
+| `npm run format` | Format all files with Prettier |
+| `npm run type-check` | TypeScript type check (no emit) |
+| `npm run test` | Run Vitest test suite |
+| `npm run test:watch` | Run Vitest in watch mode |
 
-### Local setup
+---
+
+## 🌍 Environment Variables
+
+See [`.env.example`](.env.example) for the full list with descriptions.
+
+**Frontend (`.env.local`):**
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | ✅ | Clerk publishable key |
+| `CLERK_SECRET_KEY` | ✅ | Clerk secret key |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `NEXT_PUBLIC_API_URL` | ✅ | Python backend URL |
+| `SVIX_SECRET` | ✅ | Svix webhook signing secret |
+| `EMAIL_*` | For email features | SMTP credentials |
+
+**Python backend (`python-backend/.env`):**
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `CLERK_DOMAIN` | ✅ | Clerk JWKS domain for JWT validation |
+| `FRONTEND_URL` | ✅ | Allowed CORS origin(s) |
+
+---
+
+## 🚢 Deployment
+
+### Frontend → Vercel
+
+1. Push to GitHub
+2. Import the repo in [Vercel](https://vercel.com)
+3. Set all environment variables from `.env.example` in Vercel Dashboard → Project → Settings → Environment Variables
+4. Deploy — Vercel auto-deploys on every push to `main`
+
+### Python Backend → Render
+
+1. Connect the repo in [Render](https://render.com)
+2. Use `python-backend/render.yaml` as the service definition
+3. Set `DATABASE_URL`, `CLERK_DOMAIN`, `FRONTEND_URL` in Render Dashboard → Environment
+4. First deploy triggers automatically
+
+### Python Backend → Docker (self-hosted)
 
 ```bash
-npm install
-npm run dev
+cd python-backend
+docker build -t gsf-api .
+docker run -p 8000:8000 --env-file .env gsf-api
 ```
 
-Then open: http://localhost:3000
+---
 
-### Lint / Test / Build expectations
+## 🤖 GitHub Actions Workflows
 
-```bash
-npm run lint   # ESLint (required)
-npm run test   # Vitest (required if you touched logic)
-npm run build  # Optional but recommended before PR
-```
+This repo has **41 automated workflows** handling assignment management, PR pipelines, spam detection, mentor systems, leaderboards, code quality, and AI-assisted reviews.
 
-### Contribution workflow
+See [`.github/workflows/readme.md`](.github/workflows/readme.md) for the complete reference.
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b blackboxai/your-feature`
-3. Make changes in small, focused commits
-4. Run `npm run lint` (and `npm run test` if you changed logic)
-5. Open a Pull Request
+**Required secrets** (set in GitHub → Repo → Settings → Secrets):
+| Secret | Used by |
+|--------|---------|
+| `OPENAI_API_KEY` | AI slop detection, Tenet PR review |
+| `PROJECTS_TOKEN` | GitHub Projects board management |
 
-### Route & role guidance
-- Finder for role-based areas: see **Architecture** section below.
-- When adding a new protected page, ensure role gating is enforced consistently (middleware + UI routing expectations).
-
-### Suggested PR checklist
-- [ ] README updated if routes/APIs changed
-- [ ] `npm run lint` passes
-- [ ] `npm run test` passes (when applicable)
+**Required repo variables** (Settings → Variables):
+| Variable | Default | Used by |
+|----------|---------|---------|
+| `MENTOR_LEADERBOARD_ISSUE` | `1` | Mentor leaderboard |
+| `CONTRIBUTOR_LEADERBOARD_ISSUE` | `2` | Contributor leaderboard |
+| `PROJECT_BOARD_NUMBER` | `1` | Project board management |
 
 ---
 
-## Repository Standards
+## 🤝 Contributing
 
-### Branch Protection
-- Direct pushes to `main` are restricted
-- All contributions must go through Pull Requests
+We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR.
 
-### Code Quality
-- Run lint checks before opening PR
-- Ensure project builds successfully
-
-### Pull Request Expectations
-- Keep PRs focused and meaningful
-- Link related issues
-- Add screenshots for UI changes when applicable
-
-### Review Process
-- Maintainer approval is required before merge
+1. Pick an issue and comment `/assign` to claim it
+2. Fork the repo and create a branch: `git checkout -b feat/your-feature`
+3. Make your changes with DCO sign-off: `git commit -s -m "feat: add X"`
+4. Open a PR — our automated pipeline will guide you through the rest
 
 ---
 
-## Issue Labels
+## 📄 License
 
-| Label | Description |
-|---|---|
-| `good first issue` | Beginner-friendly issues |
-| `bug` | Something is broken |
-| `enhancement` | Feature improvements |
-| `documentation` | Documentation-related tasks |
-| `help wanted` | Community contribution requested |
-
----
-
-
-## Contact
-
-**Email:** hello@gsf.community  
-**Website:** gsf.community  
-**GitHub:** [KGFCH2/GSF](https://github.com/KGFCH2/GSF)
-
----
-
-*© 2026 Global Society of Founders. A Society for Founders — Not Talkers.*
-
----
-
----
-
-## License
-
-This project is licensed under the MIT License.
+[MIT License](LICENSE.md) © 2025 GSF — Global Society of Founders

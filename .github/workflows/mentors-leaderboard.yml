@@ -1,0 +1,62 @@
+name: Mentor Leaderboard
+
+on:
+  pull_request_target:
+    types: [closed]
+  workflow_dispatch:
+
+concurrency:
+  group: mentors-leaderboard
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  update-leaderboard:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate and post mentor leaderboard
+        uses: actions/github-script@v7
+        env:
+          LEADERBOARD_ISSUE_NUMBER: ${{ vars.MENTOR_LEADERBOARD_ISSUE || '1' }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+
+            const stats = JSON.parse(fs.readFileSync('.github/reviewers/mentor-stats.json', 'utf8'));
+            const mentors = Object.entries(stats.mentors)
+              .map(([username, data]) => ({ username, ...data }))
+              .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+
+            if (mentors.length === 0) {
+              console.log('No mentor stats yet.');
+              return;
+            }
+
+            const medals = ['🥇', '🥈', '🥉'];
+            const rows = mentors.map((m, i) => {
+              const rank = medals[i] || `${i + 1}.`;
+              const avatar = `![${m.username}](https://github.com/${m.username}.png?size=32)`;
+              return `| ${rank} | ${avatar} | [@${m.username}](https://github.com/${m.username}) | ${m.reviewCount || 0} | ${m.approvals || 0} | ${m.totalScore || 0} |`;
+            }).join('\n');
+
+            const table = `## 🏆 Mentor Leaderboard\n\n> Last updated: ${new Date().toUTCString()}\n\n| Rank | Avatar | Mentor | Reviews | Approvals | Score |\n|------|--------|--------|---------|-----------|-------|\n${rows}`;
+
+            const issueNumber = parseInt(process.env.LEADERBOARD_ISSUE_NUMBER);
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: issueNumber, per_page: 100
+            });
+
+            const botComment = comments.find(c => c.user.login === 'github-actions[bot]' && c.body.includes('Mentor Leaderboard'));
+
+            if (botComment) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: botComment.id, body: table });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: table });
+            }

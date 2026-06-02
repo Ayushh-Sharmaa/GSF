@@ -1,0 +1,80 @@
+name: Mentor Review Quality Scoring
+
+on:
+  pull_request_target:
+    types: [closed]
+
+concurrency:
+  group: mentor-quality-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  score-reviews:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Score mentor reviews and update stats
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner, repo, pull_number: pr.number, per_page: 100
+            });
+
+            const statsPath = '.github/reviewers/mentor-stats.json';
+            const stats = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
+
+            for (const review of reviews) {
+              if (review.user.type === 'Bot') continue;
+              const reviewer = review.user.login;
+              const body = review.body || '';
+              const wordCount = body.trim().split(/\s+/).filter(Boolean).length;
+
+              let score = 0;
+              let quality = 'low-effort';
+
+              if (review.state === 'APPROVED' && wordCount >= 20) {
+                score = 5;
+                quality = 'merge-quality';
+              } else if (wordCount >= 20) {
+                score = 3;
+                quality = 'detailed';
+              } else {
+                score = 1;
+                quality = 'low-effort';
+              }
+
+              if (!stats.mentors[reviewer]) {
+                stats.mentors[reviewer] = {
+                  reviewCount: 0, approvals: 0, changesRequested: 0,
+                  comments: 0, totalScore: 0, lastReviewDate: null, reviews: []
+                };
+              }
+
+              stats.mentors[reviewer].totalScore = (stats.mentors[reviewer].totalScore || 0) + score;
+
+              // Tag last review with quality
+              const lastReview = stats.mentors[reviewer].reviews?.findLast?.(r => r.prNumber === pr.number);
+              if (lastReview) { lastReview.quality = quality; lastReview.score = score; }
+            }
+
+            stats.updatedAt = new Date().toISOString();
+            fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+
+      - name: Commit quality scores
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/reviewers/mentor-stats.json
+          git diff --cached --quiet || git commit -m "chore: update mentor review quality scores [skip ci]"
+          git push

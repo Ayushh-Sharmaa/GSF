@@ -1,0 +1,73 @@
+name: Remind Unresolved Review Conversations
+
+on:
+  schedule:
+    - cron: '0 10 * * *'   # Daily at 10:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: remind-unresolved
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping PR authors with unresolved review threads
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const STALE_HOURS = 48;
+            const cutoff = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000);
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+
+            for (const pr of prs) {
+              // Skip very recent PRs
+              if (new Date(pr.updated_at) >= cutoff) continue;
+
+              // Check review comments for unresolved threads
+              const reviewComments = await github.paginate(github.rest.pulls.listReviewComments, {
+                owner, repo, pull_number: pr.number, per_page: 100
+              });
+
+              // Group by in_reply_to_id to find thread roots with no reply from PR author
+              const rootComments = reviewComments.filter(c => !c.in_reply_to_id);
+              const hasUnresolved = rootComments.some(root => {
+                // A thread is "unresolved" if PR author hasn't replied since the root comment
+                const thread = reviewComments.filter(c =>
+                  c.in_reply_to_id === root.id || c.id === root.id
+                );
+                const authorReplied = thread.some(c =>
+                  c.user.login === pr.user.login && c.id !== root.id
+                );
+                return !authorReplied && new Date(root.created_at) < cutoff;
+              });
+
+              if (!hasUnresolved) continue;
+
+              // Check if we already posted a reminder recently (avoid spam)
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: pr.number, per_page: 100
+              });
+
+              const recentReminder = comments.find(c =>
+                c.user.login === 'github-actions[bot]' &&
+                c.body.includes('unresolved review conversations') &&
+                new Date(c.created_at) >= cutoff
+              );
+              if (recentReminder) continue;
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `👋 @${pr.user.login} — just a friendly reminder: this PR has **unresolved review conversations** that are more than **${STALE_HOURS} hours old**.\n\nPlease address the reviewer's comments to keep your PR moving forward. 🚀`
+              });
+            }

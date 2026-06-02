@@ -1,0 +1,58 @@
+name: Request Mentor Review
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+concurrency:
+  group: request-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  assign-mentors:
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'stage-1-approved'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Randomly assign 2 mentors for review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+
+            const mentorData = JSON.parse(fs.readFileSync('.github/reviewers/gssoc-mentors.json', 'utf8'));
+            const eligible = mentorData.mentors
+              .filter(m => m.active && m.username !== pr.user.login);
+
+            if (eligible.length === 0) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `⚠️ No eligible mentors found in the pool. @S3DFX-CYBER please assign reviewers manually.`
+              });
+              return;
+            }
+
+            // Shuffle and pick up to 2
+            const shuffled = eligible.sort(() => Math.random() - 0.5);
+            const selected = shuffled.slice(0, Math.min(2, shuffled.length)).map(m => m.username);
+
+            await github.rest.pulls.requestReviewers({
+              owner, repo, pull_number: pr.number, reviewers: selected
+            });
+
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: pr.number, labels: ['needs-mentor-review']
+            });
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: pr.number,
+              body: `🔍 **Stage 1 Passed!** Mentors have been requested for Stage 2 review:\n${selected.map(m => `- @${m}`).join('\n')}\n\nPlease review when available! Reviewers can approve with \`/approve-pr\` or \`/lgtm\` in their review. 🙏`
+            });

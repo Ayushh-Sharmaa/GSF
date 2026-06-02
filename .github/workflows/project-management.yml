@@ -1,0 +1,67 @@
+name: GitHub Project Board Management
+
+on:
+  issues:
+    types: [opened, closed]
+  pull_request_target:
+    types: [opened, closed]
+
+concurrency:
+  group: project-mgmt-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  manage-project:
+    runs-on: ubuntu-latest
+    # Requires PROJECTS_TOKEN secret with project write access (classic PAT or fine-grained with Projects read/write)
+    steps:
+      - name: Add to GitHub Project board
+        uses: actions/github-script@v7
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+          PROJECT_NUMBER: ${{ vars.PROJECT_BOARD_NUMBER || '1' }}
+        with:
+          github-token: ${{ env.PROJECTS_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            if (!process.env.PROJECTS_TOKEN) {
+              console.log('PROJECTS_TOKEN not set — skipping project board update.');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const item = context.payload.issue || context.payload.pull_request;
+            const action = context.payload.action;
+            const nodeId = item.node_id;
+            const isClosed = action === 'closed';
+
+            // Get the project's node ID
+            const projectQuery = await github.graphql(`
+              query($owner: String!, $number: Int!) {
+                user(login: $owner) {
+                  projectV2(number: $number) { id }
+                }
+              }
+            `, { owner, number: parseInt(process.env.PROJECT_NUMBER) });
+
+            const projectId = projectQuery?.user?.projectV2?.id;
+            if (!projectId) {
+              console.log('Project not found — check PROJECT_BOARD_NUMBER variable.');
+              return;
+            }
+
+            // Add item to project
+            const addResult = await github.graphql(`
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                  item { id }
+                }
+              }
+            `, { projectId, contentId: nodeId });
+
+            console.log('Item added to project board:', addResult?.addProjectV2ItemById?.item?.id);
+            // TODO: update Status field to In Progress / Done based on action

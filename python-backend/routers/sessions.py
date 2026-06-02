@@ -57,3 +57,18 @@ async def create_session(
     await db.commit()
     await db.refresh(session)
     return session
+
+
+@router.get("/{session_id}")
+async def get_session(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.founder_clerk_id != user_id and session.expert_clerk_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return session

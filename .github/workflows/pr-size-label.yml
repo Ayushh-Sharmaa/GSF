@@ -1,0 +1,49 @@
+name: PR Size Label
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  label-size:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply size label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const total = (pr.additions || 0) + (pr.deletions || 0);
+
+            const sizes = [
+              { label: 'size/XS', max: 10,  color: '3CBF00' },
+              { label: 'size/S',  max: 50,  color: '5D9801' },
+              { label: 'size/M',  max: 150, color: '7F7203' },
+              { label: 'size/L',  max: 500, color: 'A14C05' },
+              { label: 'size/XL', max: Infinity, color: 'C32607' },
+            ];
+
+            const chosen = sizes.find(s => total < s.max) || sizes[sizes.length - 1];
+
+            // Remove old size/* labels
+            for (const lbl of pr.labels || []) {
+              if (lbl.name.startsWith('size/')) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: lbl.name }); } catch {}
+              }
+            }
+
+            // Ensure label exists
+            try { await github.rest.issues.getLabel({ owner, repo, name: chosen.label }); }
+            catch { await github.rest.issues.createLabel({ owner, repo, name: chosen.label, color: chosen.color }); }
+
+            await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [chosen.label] });

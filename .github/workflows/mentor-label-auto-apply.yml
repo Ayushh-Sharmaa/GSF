@@ -1,0 +1,65 @@
+name: Mentor Label Auto-Apply
+
+on:
+  pull_request_target:
+    types: [review_requested]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [assigned]
+
+concurrency:
+  group: mentor-label-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  apply-mentor-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply mentor label on review request, review, or assignment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const event = context.eventName;
+            const action = context.payload.action;
+
+            let mentorLogin = null;
+            let targetNumber = null;
+            let targetType = null;
+
+            if (event === 'pull_request_target' && action === 'review_requested') {
+              mentorLogin = context.payload.requested_reviewer?.login;
+              targetNumber = context.payload.pull_request.number;
+              targetType = 'pr';
+            } else if (event === 'pull_request_review' && action === 'submitted') {
+              mentorLogin = context.payload.review.user.login;
+              targetNumber = context.payload.pull_request.number;
+              targetType = 'pr';
+            } else if (event === 'issues' && action === 'assigned') {
+              mentorLogin = context.payload.assignee?.login;
+              targetNumber = context.payload.issue.number;
+              targetType = 'issue';
+            }
+
+            if (!mentorLogin || !targetNumber) return;
+
+            const labelName = `mentor:${mentorLogin}`;
+
+            // Ensure label exists
+            try { await github.rest.issues.getLabel({ owner, repo, name: labelName }); }
+            catch {
+              await github.rest.issues.createLabel({ owner, repo, name: labelName, color: '0075ca', description: `Reviewed/assigned by mentor ${mentorLogin}` });
+            }
+
+            // Check if already applied
+            const current = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: targetNumber });
+            const already = current.data.some(l => l.name === labelName);
+            if (already) return;
+
+            await github.rest.issues.addLabels({ owner, repo, issue_number: targetNumber, labels: [labelName] });

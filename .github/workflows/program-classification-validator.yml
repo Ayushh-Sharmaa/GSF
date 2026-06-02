@@ -1,0 +1,67 @@
+name: Program Classification Validator
+
+on:
+  pull_request_target:
+    types: [opened, edited, labeled]
+
+concurrency:
+  group: program-validator-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  validate-program:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate program declaration matches labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const body = (pr.body || '').toLowerCase();
+            const labels = pr.labels.map(l => l.name.toLowerCase());
+
+            const programs = [
+              { declared: /gssoc/i,   label: 'gssoc26' },
+              { declared: /nsoc/i,    label: 'nsoc26' },
+              { declared: /general/i, label: 'general-oss' },
+            ];
+
+            const declared = programs.find(p => p.declared.test(body));
+            const hasLabel = declared ? labels.includes(declared.label) : false;
+
+            const ensureLabel = async (name, color, description = '') => {
+              try { await github.rest.issues.getLabel({ owner, repo, name }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name, color, description }); }
+            };
+
+            if (!declared) {
+              // No program declared in body
+              await ensureLabel('needs-pr-fixes', 'E4E669');
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['needs-pr-fixes'] });
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `⚠️ @${pr.user.login} — your PR body doesn't declare a program (GSSoC/NSoC/General). Please update your description to include the program name. 📝`
+              });
+              return;
+            }
+
+            if (!hasLabel) {
+              await ensureLabel('invalid-program-declaration', 'EE0701', "Declared program doesn't match labels");
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['invalid-program-declaration'] });
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: 'program-validated' }); } catch {}
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `❌ **Program Mismatch** — Your PR declares **${declared.label.toUpperCase()}** but the \`${declared.label}\` label is not applied.\n\nPlease ensure the correct program label is on your PR, or update your PR description to match. A maintainer can also fix this. 🏷️`
+              });
+            } else {
+              await ensureLabel('program-validated', '0E8A16', 'Program track declared and validated');
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['program-validated'] });
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr.number, name: 'invalid-program-declaration' }); } catch {}
+            }

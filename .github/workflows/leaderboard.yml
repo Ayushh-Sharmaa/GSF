@@ -1,0 +1,69 @@
+name: Contributor Leaderboard
+
+on:
+  pull_request_target:
+    types: [closed]
+  workflow_dispatch:
+
+concurrency:
+  group: leaderboard
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+  pull-requests: read
+  contents: read
+
+jobs:
+  update-leaderboard:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    steps:
+      - name: Generate contributor leaderboard
+        uses: actions/github-script@v7
+        env:
+          LEADERBOARD_ISSUE_NUMBER: ${{ vars.CONTRIBUTOR_LEADERBOARD_ISSUE || '2' }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            // Fetch all merged PRs
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'closed', per_page: 100
+            });
+
+            const mergedPRs = prs.filter(p => p.merged_at);
+
+            // Count by contributor
+            const counts = {};
+            for (const pr of mergedPRs) {
+              const user = pr.user.login;
+              if (user === 'github-actions[bot]') continue;
+              counts[user] = (counts[user] || 0) + 1;
+            }
+
+            const sorted = Object.entries(counts)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 20);
+
+            const medals = ['🥇', '🥈', '🥉'];
+            const rows = sorted.map(([username, count], i) => {
+              const rank = medals[i] || `${i + 1}.`;
+              const avatar = `![${username}](https://github.com/${username}.png?size=32)`;
+              return `| ${rank} | ${avatar} | [@${username}](https://github.com/${username}) | ${count} |`;
+            }).join('\n');
+
+            const table = `## 🏆 Contributor Leaderboard\n\n> Last updated: ${new Date().toUTCString()}\n\n| Rank | Avatar | Contributor | Merged PRs |\n|------|--------|-------------|------------|\n${rows}`;
+
+            const issueNumber = parseInt(process.env.LEADERBOARD_ISSUE_NUMBER);
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: issueNumber, per_page: 100
+            });
+
+            const botComment = comments.find(c => c.user.login === 'github-actions[bot]' && c.body.includes('Contributor Leaderboard'));
+
+            if (botComment) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: botComment.id, body: table });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: table });
+            }

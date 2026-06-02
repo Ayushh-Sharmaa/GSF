@@ -1,0 +1,64 @@
+name: Stage 2 Review Approval
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: stage2-approval-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  handle-mentor-approval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Process /approve-pr or /lgtm command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const review = context.payload.review;
+            const pr = context.payload.pull_request;
+            const reviewer = review.user.login;
+            const reviewBody = (review.body || '').toLowerCase().trim();
+
+            const hasCommand = /\/approve-pr|\/lgtm/.test(reviewBody);
+            if (!hasCommand) return;
+
+            // Check if reviewer is in mentor list
+            const mentorData = JSON.parse(fs.readFileSync('.github/reviewers/gssoc-mentors.json', 'utf8'));
+            const isMentor = mentorData.mentors.some(m => m.username === reviewer && m.active);
+
+            if (!isMentor) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `❌ @${reviewer} — only recognized mentors can use \`/approve-pr\` or \`/lgtm\`. If you believe this is an error, please contact the Project Admin.`
+              });
+              return;
+            }
+
+            const ensureLabel = async (name, color, description = '') => {
+              try { await github.rest.issues.getLabel({ owner, repo, name }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name, color, description }); }
+            };
+
+            await ensureLabel('mentor-approved', '1D76DB', 'Approved by a mentor (Stage 2)');
+            await ensureLabel('pa-review-required', 'F9D0C4', 'Awaiting Project Admin review (Stage 3)');
+
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: pr.number,
+              labels: ['mentor-approved', 'pa-review-required']
+            });
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: pr.number,
+              body: `✅ **Mentor Approved** by @${reviewer}!\n\nThis PR is now escalated to **Stage 3 — Project Admin Review**. @S3DFX-CYBER please review when available. 🙏`
+            });

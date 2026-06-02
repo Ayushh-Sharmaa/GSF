@@ -1,0 +1,81 @@
+name: Mentor Review Timeout & Rotation
+
+on:
+  schedule:
+    - cron: '0 */8 * * *'   # Every 8 hours
+  workflow_dispatch:
+
+concurrency:
+  group: mentor-review-timeout
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  rotate-inactive-reviewers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rotate unresponsive mentor reviewers
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { owner, repo } = context.repo;
+            const TIMEOUT_HOURS = 24;
+            const cutoff = new Date(Date.now() - TIMEOUT_HOURS * 60 * 60 * 1000);
+
+            const mentorData = JSON.parse(fs.readFileSync('.github/reviewers/gssoc-mentors.json', 'utf8'));
+            const activeMentors = mentorData.mentors.filter(m => m.active).map(m => m.username);
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+
+            for (const pr of prs) {
+              const labels = pr.labels.map(l => l.name);
+              if (!labels.includes('needs-mentor-review')) continue;
+
+              // Check review requests older than cutoff
+              const reviewRequests = await github.rest.pulls.listRequestedReviewers({
+                owner, repo, pull_number: pr.number
+              });
+
+              const requestedReviewers = reviewRequests.data.users.map(u => u.login);
+              if (requestedReviewers.length === 0) continue;
+
+              // Check review events timeline for request dates
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner, repo, pull_number: pr.number, per_page: 100
+              });
+
+              const reviewers = new Set(reviews.map(r => r.user.login));
+              const inactive = requestedReviewers.filter(r => !reviewers.has(r));
+              if (inactive.length === 0) continue;
+
+              // Only rotate if PR was updated beyond cutoff
+              if (new Date(pr.updated_at) >= cutoff) continue;
+
+              // Select new mentors
+              const available = activeMentors.filter(m => !requestedReviewers.includes(m) && m !== pr.user.login);
+              if (available.length === 0) continue;
+
+              const newMentors = available.sort(() => Math.random() - 0.5).slice(0, Math.min(2, available.length));
+
+              // Remove inactive, add new
+              await github.rest.pulls.removeRequestedReviewers({
+                owner, repo, pull_number: pr.number, reviewers: inactive
+              });
+              await github.rest.pulls.requestReviewers({
+                owner, repo, pull_number: pr.number, reviewers: newMentors
+              });
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `🔄 **Mentor Rotation** — The following reviewers were inactive for 24+ hours and have been replaced:\n${inactive.map(r => `- ~~@${r}~~`).join('\n')}\n\nNew reviewers assigned:\n${newMentors.map(r => `- @${r}`).join('\n')}\n\nPlease review when available! 🙏`
+              });
+            }

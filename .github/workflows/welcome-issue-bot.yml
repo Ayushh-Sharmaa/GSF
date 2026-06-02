@@ -1,0 +1,40 @@
+name: Welcome Issue Bot
+
+on:
+  issues:
+    types: [opened]
+
+concurrency:
+  group: welcome-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    if: github.event.sender.type != 'Bot'
+    steps:
+      - name: Post welcome for first-time issue authors
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const author = context.payload.issue.user.login;
+
+            // Search for prior issues OR PRs from this user
+            const history = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${owner}/${repo} author:${author}`
+            });
+
+            // Subtract 1 for the current issue itself
+            const priorCount = history.data.total_count - 1;
+            if (priorCount > 0) return; // not their first contribution
+
+            await github.rest.issues.createComment({
+              owner, repo,
+              issue_number: context.payload.issue.number,
+              body: `👋 **Welcome to GSF, @${author}!** We're so glad to have you here! 🎉\n\nThank you for opening your first issue. Here are some resources to help you get started:\n\n- 📖 [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) — contribution guidelines\n- 🗺️ [README.md](../blob/main/README.md) — project overview\n- 💬 [Discussions](../discussions) — ask questions and share ideas\n\nA maintainer will review your issue shortly. Please be patient — we're all volunteers! 🙏`
+            });

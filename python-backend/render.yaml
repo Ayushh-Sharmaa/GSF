@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: gsf-python-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false   # Set in Render dashboard
+      - key: CLERK_DOMAIN
+        sync: false   # Set in Render dashboard
+      - key: FRONTEND_URL
+        sync: false   # Set in Render dashboard (e.g. https://gsf.community)
+      - key: PORT
+        value: 10000

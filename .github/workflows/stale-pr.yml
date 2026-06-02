@@ -1,0 +1,72 @@
+name: Stale PR Management
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # Daily at 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: stale-pr
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  stale-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warn and close stale PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const WARN_DAYS  = 14;
+            const CLOSE_DAYS = 21;
+            const now = Date.now();
+
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+
+            for (const pr of prs) {
+              const labels = pr.labels.map(l => l.name);
+              if (labels.includes('no-stale')) continue;
+
+              // Find last meaningful activity
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: pr.number, per_page: 100
+              });
+              const commits = await github.paginate(github.rest.pulls.listCommits, {
+                owner, repo, pull_number: pr.number, per_page: 100
+              });
+
+              const dates = [
+                new Date(pr.updated_at),
+                ...comments.map(c => new Date(c.created_at)),
+                ...commits.map(c => new Date(c.commit.committer.date))
+              ];
+              const lastActivity = Math.max(...dates.map(d => d.getTime()));
+              const daysSince = (now - lastActivity) / (1000 * 60 * 60 * 24);
+
+              if (labels.includes('stale') && daysSince >= CLOSE_DAYS) {
+                // Close it
+                await github.rest.pulls.update({ owner, repo, pull_number: pr.number, state: 'closed' });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: pr.number,
+                  body: `🔒 This PR has been **automatically closed** due to **${CLOSE_DAYS}+ days of inactivity**.\n\nFeel free to reopen it if you'd like to continue. We appreciate your contribution! 💙`
+                });
+              } else if (!labels.includes('stale') && daysSince >= WARN_DAYS) {
+                // Warn
+                try { await github.rest.issues.getLabel({ owner, repo, name: 'stale' }); }
+                catch { await github.rest.issues.createLabel({ owner, repo, name: 'stale', color: 'EDEDED', description: 'No recent activity' }); }
+
+                await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['stale'] });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: pr.number,
+                  body: `⚠️ **Stale PR Warning** — This PR has had **no activity for ${WARN_DAYS} days**.\n\nIt will be **automatically closed in ${CLOSE_DAYS - WARN_DAYS} days** unless there is new activity. Push a commit, respond to comments, or add the \`no-stale\` label to keep it open. 🙏`
+                });
+              }
+            }

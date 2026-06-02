@@ -1,0 +1,89 @@
+name: Detect AI-Generated Content (Slop Detection)
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+concurrency:
+  group: detect-ai-slop-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  ai-slop-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Analyze PR diff for AI-generated content
+        uses: actions/github-script@v7
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+
+            if (!process.env.OPENAI_API_KEY) {
+              console.log('OPENAI_API_KEY not set — skipping AI slop check');
+              return;
+            }
+
+            // Fetch diff
+            const diffResponse = await github.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+              owner, repo, pull_number: pr.number,
+              headers: { accept: 'application/vnd.github.v3.diff' }
+            });
+            const diff = typeof diffResponse.data === 'string' ? diffResponse.data : '';
+            if (!diff || diff.length < 50) return;
+
+            // Truncate to 4000 chars for API
+            const truncatedDiff = diff.slice(0, 4000);
+
+            const payload = {
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a code review assistant that detects low-quality AI-generated contributions. Respond ONLY with a JSON object: {"suspicious": boolean, "reason": "short reason", "confidence": "low|medium|high"}'
+                },
+                {
+                  role: 'user',
+                  content: `Review this PR diff and determine if it appears to be AI-generated, generic/templated, or low-effort:\n\n${truncatedDiff}`
+                }
+              ],
+              temperature: 0.2,
+              max_tokens: 200
+            };
+
+            let result;
+            try {
+              const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+                },
+                body: JSON.stringify(payload)
+              });
+              const data = await res.json();
+              result = JSON.parse(data.choices?.[0]?.message?.content || '{"suspicious":false}');
+            } catch (e) {
+              console.log('AI check failed:', e.message);
+              return;
+            }
+
+            if (result.suspicious && result.confidence !== 'low') {
+              try { await github.rest.issues.getLabel({ owner, repo, name: 'suspected-ai-slop' }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name: 'suspected-ai-slop', color: 'EE0701', description: 'Flagged as possible AI-generated low-effort content' }); }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['suspected-ai-slop'] });
+
+              await github.rest.pulls.createReview({
+                owner, repo, pull_number: pr.number,
+                event: 'COMMENT',
+                body: `🤖 **AI Content Detection Flag** (Confidence: ${result.confidence})\n\n${result.reason}\n\nA mentor will review this PR more carefully. If this flag is incorrect, please add a comment explaining your thought process behind the changes.`
+              });
+            }

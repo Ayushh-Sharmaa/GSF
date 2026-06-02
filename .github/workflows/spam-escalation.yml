@@ -1,0 +1,50 @@
+name: Spam Escalation
+
+on:
+  issues:
+    types: [labeled]
+  pull_request_target:
+    types: [labeled]
+
+concurrency:
+  group: spam-escalation-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  escalate-spam:
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'spam' || github.event.label.name == 'gssoc:spam'
+    steps:
+      - name: Handle spam-labeled item
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const PROJECT_ADMIN = 'S3DFX-CYBER';
+            const item = context.payload.issue || context.payload.pull_request;
+            const itemNumber = item.number;
+            const author = item.user.login;
+            const isPR = !!context.payload.pull_request;
+
+            // Remove author's assignment if assigned
+            if (item.assignees?.some(a => a.login === author)) {
+              if (isPR) {
+                // For PRs, can't remove assignee directly via issues API in pull_request_target context
+                // Just note it
+                console.log(`Note: PR author ${author} is assigned — maintainer should review`);
+              } else {
+                await github.rest.issues.removeAssignees({
+                  owner, repo, issue_number: itemNumber, assignees: [author]
+                });
+              }
+            }
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: itemNumber,
+              body: `🚨 **Spam Flagged** — @${author}, this ${isPR ? 'pull request' : 'issue'} has been flagged as spam.\n\nIf you believe this is a mistake, please reach out to a maintainer.\n\n@${PROJECT_ADMIN} — flagged for your review. 👀`
+            });

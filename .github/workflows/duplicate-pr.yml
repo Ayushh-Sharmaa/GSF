@@ -1,0 +1,56 @@
+name: Duplicate PR Detection
+
+on:
+  pull_request_target:
+    types: [opened]
+
+concurrency:
+  group: dup-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  check-dup-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect duplicate PRs targeting same issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const body = pr.body || '';
+
+            // Extract linked issue number
+            const issueMatch = body.match(/closes\s+#(\d+)/i);
+            if (!issueMatch) return; // no linked issue, skip
+
+            const linkedIssue = parseInt(issueMatch[1]);
+
+            // Find other open PRs linking the same issue
+            const openPRs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+
+            const duplicates = openPRs.filter(p => {
+              if (p.number === pr.number) return false;
+              const match = (p.body || '').match(/closes\s+#(\d+)/i);
+              return match && parseInt(match[1]) === linkedIssue;
+            });
+
+            if (duplicates.length > 0) {
+              try { await github.rest.issues.getLabel({ owner, repo, name: 'duplicate-pr' }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name: 'duplicate-pr', color: 'CFD3D7', description: 'Duplicate PR targeting the same issue' }); }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: ['duplicate-pr'] });
+
+              const list = duplicates.map(d => `- #${d.number} by @${d.user.login}`).join('\n');
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `⚠️ **Duplicate PR Detected**\n\nThis PR targets **#${linkedIssue}**, which is already referenced by:\n\n${list}\n\nPlease coordinate with the existing PR author(s) to avoid duplicate work. If your changes are genuinely different, please explain in a comment. 🙏`
+              });
+            }

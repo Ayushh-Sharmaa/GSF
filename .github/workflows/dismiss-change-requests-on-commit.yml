@@ -1,0 +1,52 @@
+name: Dismiss Stale Change Requests on New Commit
+
+on:
+  pull_request_target:
+    types: [synchronize]
+
+concurrency:
+  group: dismiss-cr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  dismiss-change-requests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dismiss stale CHANGES_REQUESTED reviews
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner, repo, pull_number: pr.number, per_page: 100
+            });
+
+            // Keep only the latest review per user, dismiss CHANGES_REQUESTED from non-bots
+            const latestByUser = {};
+            for (const r of reviews) {
+              if (!latestByUser[r.user.login] || new Date(r.submitted_at) > new Date(latestByUser[r.user.login].submitted_at)) {
+                latestByUser[r.user.login] = r;
+              }
+            }
+
+            for (const review of Object.values(latestByUser)) {
+              if (review.state !== 'CHANGES_REQUESTED') continue;
+              if (review.user.type === 'Bot') continue;
+
+              try {
+                await github.rest.pulls.dismissReview({
+                  owner, repo,
+                  pull_number: pr.number,
+                  review_id: review.id,
+                  message: '🔄 Dismissed due to new commits — please re-review the latest changes.'
+                });
+              } catch (e) {
+                console.log(`Could not dismiss review ${review.id}: ${e.message}`);
+              }
+            }

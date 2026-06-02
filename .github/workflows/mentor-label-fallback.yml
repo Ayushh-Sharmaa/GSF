@@ -1,0 +1,60 @@
+name: Mentor Label Fallback
+
+on:
+  pull_request_target:
+    types: [closed]
+  issues:
+    types: [closed]
+
+concurrency:
+  group: mentor-fallback-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  fallback-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply fallback mentor label if none present
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const DEFAULT_MENTOR = 'Ayushh-Sharmaa';
+            const { owner, repo } = context.repo;
+            const event = context.eventName;
+
+            // For PRs: only when merged
+            if (event === 'pull_request_target') {
+              const pr = context.payload.pull_request;
+              if (!pr.merged) return;
+
+              const labels = pr.labels.map(l => l.name);
+              if (labels.some(l => l.startsWith('mentor:'))) return;
+
+              const fallbackLabel = `mentor:${DEFAULT_MENTOR}`;
+              try { await github.rest.issues.getLabel({ owner, repo, name: fallbackLabel }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name: fallbackLabel, color: '0075ca', description: `Reviewed/assigned by mentor ${DEFAULT_MENTOR}` }); }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [fallbackLabel] });
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: `ℹ️ No \`mentor:*\` label was found on this PR at merge time. The fallback label \`${fallbackLabel}\` has been applied automatically. If this is incorrect, a maintainer can update it. 🏷️`
+              });
+            }
+
+            // For issues: just apply if no mentor label
+            if (event === 'issues') {
+              const issue = context.payload.issue;
+              const labels = issue.labels.map(l => l.name);
+              if (labels.some(l => l.startsWith('mentor:'))) return;
+
+              const fallbackLabel = `mentor:${DEFAULT_MENTOR}`;
+              try { await github.rest.issues.getLabel({ owner, repo, name: fallbackLabel }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name: fallbackLabel, color: '0075ca', description: `Reviewed/assigned by mentor ${DEFAULT_MENTOR}` }); }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: [fallbackLabel] });
+            }

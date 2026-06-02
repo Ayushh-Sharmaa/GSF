@@ -1,0 +1,48 @@
+name: Tenet AI PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency:
+  group: tenet-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            agent/tenet_agent/requirements.txt
+
+      - name: Install tenet agent dependencies
+        run: |
+          if [ -f "agent/tenet_agent/requirements.txt" ]; then
+            pip install -r agent/tenet_agent/requirements.txt
+          else
+            echo "⚠️  agent/tenet_agent/requirements.txt not found — skipping."
+            exit 0
+          fi
+
+      - name: Run Tenet AI review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -f "agent/tenet_agent/tenet_review.py" ]; then
+            python agent/tenet_agent/tenet_review.py
+          else
+            echo "⚠️  agent/tenet_agent/tenet_review.py not found — skipping AI review."
+          fi

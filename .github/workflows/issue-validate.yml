@@ -1,0 +1,58 @@
+name: Issue Validation
+
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: issue-validate-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  issues: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    if: github.event.sender.type != 'Bot'
+    steps:
+      - name: Validate issue body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+
+            const requiredSections = [
+              { key: 'description',        pattern: /description/i },
+              { key: 'steps to reproduce', pattern: /steps\s+to\s+reproduce/i },
+              { key: 'expected behavior',  pattern: /expected\s+beh/i },
+            ];
+
+            const missing = requiredSections.filter(s => !s.pattern.test(body)).map(s => `\`${s.key}\``);
+
+            if (missing.length > 0) {
+              // Add needs-more-info label
+              try { await github.rest.issues.getLabel({ owner, repo, name: 'needs-more-info' }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name: 'needs-more-info', color: 'D876E3', description: 'Issue needs more detail' }); }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: ['needs-more-info'] });
+
+              // Remove valid-issue label if present
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number: issue.number, name: 'valid-issue' }); } catch {}
+
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issue.number,
+                body: `👋 @${issue.user.login} — thank you for opening this issue!\n\nIt looks like the following required sections are **missing or incomplete**: ${missing.join(', ')}.\n\nPlease edit your issue to include these sections so we can address it promptly. You can use the issue template as a guide. 📝`
+              });
+            } else {
+              // All sections present
+              try { await github.rest.issues.getLabel({ owner, repo, name: 'valid-issue' }); }
+              catch { await github.rest.issues.createLabel({ owner, repo, name: 'valid-issue', color: '0E8A16', description: 'Issue passed validation' }); }
+
+              await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: ['valid-issue'] });
+
+              // Remove needs-more-info if present
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number: issue.number, name: 'needs-more-info' }); } catch {}
+            }

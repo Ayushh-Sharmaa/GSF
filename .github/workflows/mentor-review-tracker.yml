@@ -1,0 +1,64 @@
+name: Mentor Review Tracker
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: mentor-tracker-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  track-review:
+    runs-on: ubuntu-latest
+    if: github.event.review.user.type != 'Bot'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update mentor-stats.json
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reviewer = context.payload.review.user.login;
+            const state = context.payload.review.state; // APPROVED | CHANGES_REQUESTED | COMMENTED
+            const prNumber = context.payload.pull_request.number;
+
+            const statsPath = '.github/reviewers/mentor-stats.json';
+            const stats = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
+
+            if (!stats.mentors[reviewer]) {
+              stats.mentors[reviewer] = {
+                reviewCount: 0,
+                approvals: 0,
+                changesRequested: 0,
+                comments: 0,
+                totalScore: 0,
+                lastReviewDate: null,
+                reviews: []
+              };
+            }
+
+            const mentor = stats.mentors[reviewer];
+            mentor.reviewCount++;
+            mentor.lastReviewDate = new Date().toISOString();
+            mentor.reviews.push({ prNumber, state, date: new Date().toISOString() });
+
+            if (state === 'APPROVED') mentor.approvals++;
+            else if (state === 'CHANGES_REQUESTED') mentor.changesRequested++;
+            else mentor.comments++;
+
+            stats.updatedAt = new Date().toISOString();
+            fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+
+      - name: Commit updated stats
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/reviewers/mentor-stats.json
+          git diff --cached --quiet || git commit -m "chore: update mentor review stats [skip ci]"
+          git push
